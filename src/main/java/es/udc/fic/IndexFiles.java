@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
+import java.util.Properties;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -93,6 +94,8 @@ public class IndexFiles {
 		String indexPath = "index";
 		String docsPath = null;
 		boolean create = true;
+		String openmode = null;
+		int threads=0;
 		for (int i = 0; i < args.length; i++) {
 			if ("-index".equals(args[i])) {
 				indexPath = args[i + 1];
@@ -102,6 +105,12 @@ public class IndexFiles {
 				i++;
 			} else if ("-update".equals(args[i])) {
 				create = false;
+			} else if ("-openmode".equals(args[i])) {
+				openmode = args[i + 1];
+				i++;
+			}else if ("-numThreads".equals(args[i])) {
+				threads = Integer.valueOf(args[i+1]);
+				i++;
 			}
 		}
 
@@ -125,12 +134,14 @@ public class IndexFiles {
 			Analyzer analyzer = new StandardAnalyzer();
 			IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
 
-			if (create) {
-				// Create a new index in the directory, removing any
-				// previously indexed documents:
+			if ((!create && openmode==null) || openmode.equals("create_or_append") ) {
+				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+			} else if (create && openmode.equals("create")) {
 				iwc.setOpenMode(OpenMode.CREATE);
+			} else if ( openmode.equals("append")) {
+				iwc.setOpenMode(OpenMode.APPEND);
 			} else {
-				// Add new documents to an existing index:
+				System.out.println("openMode error: Correct formats are append, create(not compatible with -upgrade) or create_or_append. Running create_or_append as default" );
 				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
 			}
 			IndexWriter writer = new IndexWriter(dir, iwc);
@@ -141,7 +152,8 @@ public class IndexFiles {
 		 * resources needed by the threads.
 		 */
 		final int numCores = Runtime.getRuntime().availableProcessors();
-		final ExecutorService executor = Executors.newFixedThreadPool(numCores);
+		if(threads<1) threads=numCores;
+		final ExecutorService executor = Executors.newFixedThreadPool(threads);
 
 		/*
 		 * We use Java 7 NIO.2 methods for input/output management. More info in:
