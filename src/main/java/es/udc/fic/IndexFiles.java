@@ -37,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.Properties;
+import java.io.File;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -88,20 +89,24 @@ public class IndexFiles {
 
 	public static void main(final String[] args) {
 
-		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-docs DOCS_PATH] [-update]\n\n"
-				+ "This indexes the documents in DOCS_PATH, creating a Lucene index"
-				+ "in INDEX_PATH that can be searched with SearchFiles";
+		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] \n\n";
+		
+		File f = new File("./src/main/resources/config.properties");
+		Properties p = new Properties();
+		try {
+			p.load(Files.newInputStream(Path.of("./src/main/resources/config.properties")));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 		String indexPath = "index";
-		String docsPath = null;
+		String docsPath = p.getProperty("docs");
 		boolean create = true;
 		String openmode = null;
 		int threads=0;
 		for (int i = 0; i < args.length; i++) {
 			if ("-index".equals(args[i])) {
 				indexPath = args[i + 1];
-				i++;
-			} else if ("-docs".equals(args[i])) {
-				docsPath = args[i + 1];
 				i++;
 			} else if ("-update".equals(args[i])) {
 				create = false;
