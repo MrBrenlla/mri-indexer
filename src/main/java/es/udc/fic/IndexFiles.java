@@ -37,8 +37,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.Properties;
-import java.io.File;
-
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.DateTools;
@@ -53,6 +51,7 @@ import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.MMapDirectory;
 
 public class IndexFiles {
 
@@ -63,10 +62,12 @@ public class IndexFiles {
 
 		private final Path folder;
 		private final IndexWriter w;
+		private final boolean parcialIndex; 
 
-		public WorkerThread(final Path folder, IndexWriter w) {
+		public WorkerThread(final Path folder, IndexWriter w, boolean p) {
 			this.folder = folder;
 			this.w=w;
+			this.parcialIndex = p;
 		}
 
 		/**
@@ -79,6 +80,7 @@ public class IndexFiles {
 					Thread.currentThread().getName(), folder));
 			try {
 				indexDocs(w, folder);
+				if(this.parcialIndex) w.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -89,9 +91,8 @@ public class IndexFiles {
 
 	public static void main(final String[] args) {
 
-		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] \n\n";
+		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes]\n\n";
 		
-		File f = new File("./src/main/resources/config.properties");
 		Properties p = new Properties();
 		try {
 			p.load(Files.newInputStream(Path.of("./src/main/resources/config.properties")));
@@ -102,6 +103,7 @@ public class IndexFiles {
 		String indexPath = "index";
 		String docsPath = p.getProperty("docs");
 		boolean create = true;
+		boolean parcial = false;
 		String openmode = null;
 		int threads=0;
 		for (int i = 0; i < args.length; i++) {
@@ -110,6 +112,8 @@ public class IndexFiles {
 				i++;
 			} else if ("-update".equals(args[i])) {
 				create = false;
+			} else if ("-partialIndexes".equals(args[i])) {
+				parcial = true;
 			} else if ("-openmode".equals(args[i])) {
 				openmode = args[i + 1];
 				i++;
@@ -119,11 +123,12 @@ public class IndexFiles {
 			}
 		}
 
-		if (docsPath == null) {
+		if(indexPath.equals("index")) {
 			System.err.println("Usage: " + usage);
 			System.exit(1);
 		}
-
+			
+		
 		final Path docDir = Paths.get(docsPath);
 		if (!Files.isReadable(docDir)) {
 			System.out.println("Document directory '" + docDir.toAbsolutePath()
@@ -149,7 +154,8 @@ public class IndexFiles {
 				System.out.println("openMode error: Correct formats are append, create(not compatible with -upgrade) or create_or_append. Running create_or_append as default" );
 				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
 			}
-			IndexWriter writer = new IndexWriter(dir, iwc);
+			IndexWriter finalwriter = new IndexWriter(dir, iwc);
+			IndexWriter writer = finalwriter;
 
 		/*
 		 * Create a ExecutorService (ThreadPool is a subclass of ExecutorService) with
@@ -168,12 +174,35 @@ public class IndexFiles {
 		 * https://docs.oracle.com/javase/tutorial/essential/exceptions/
 		 * tryResourceClose.html
 		 */
+		int i = 0;
+		String parcialPath;
 		try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(Paths.get(docsPath))) {
 			ArrayList<Path> list = new ArrayList<Path>();
 			/* We process each subfolder in a new thread. */
 			for (final Path path : directoryStream) {
 				if (Files.isDirectory(path)) {
-					final Runnable worker = new WorkerThread(path,writer);
+					if (parcial) {
+							parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i);
+							System.out.println("Parcial indexing "+path.toString()+" to directory '" + parcialPath + "'...");
+
+							dir = FSDirectory.open(Paths.get(parcialPath));
+							analyzer = new StandardAnalyzer();
+							iwc = new IndexWriterConfig(analyzer);
+
+							if ((!create && openmode==null) || openmode.equals("create_or_append") ) {
+								iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+							} else if (create && openmode.equals("create")) {
+								iwc.setOpenMode(OpenMode.CREATE);
+							} else if ( openmode.equals("append")) {
+								iwc.setOpenMode(OpenMode.APPEND);
+							} else {
+								System.out.println("openMode error: Correct formats are append, create(not compatible with -upgrade) or create_or_append. Running create_or_append as default" );
+								iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+							}
+							writer = new IndexWriter(dir, iwc);
+							i++;
+					}
+					final Runnable worker = new WorkerThread(path,writer,parcial);
 					/*
 					 * Send the thread to the ThreadPool. It will be processed eventually.
 					 */
@@ -182,12 +211,29 @@ public class IndexFiles {
 					list.add(path);
 				}
 			}
-				/* We process each subfolder in a new thread. */
-				for (final Path path : list) {
-					if (!Files.isDirectory(path)) {
-						indexDocs(writer,path);
-					}	
+			if (parcial) {
+				parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i);
+				System.out.println("Parcial indexing remaining files to directory '" + parcialPath + "'...");
+
+				dir = FSDirectory.open(Paths.get(parcialPath));
+				analyzer = new StandardAnalyzer();
+				iwc = new IndexWriterConfig(analyzer);
+
+				if ((!create && openmode==null) || openmode.equals("create_or_append") ) {
+					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+				} else if (create && openmode.equals("create")) {
+					iwc.setOpenMode(OpenMode.CREATE);
+				} else if ( openmode.equals("append")) {
+					iwc.setOpenMode(OpenMode.APPEND);
+				} else {
+					System.out.println("openMode error: Correct formats are append, create(not compatible with -upgrade) or create_or_append. Running create_or_append as default" );
+					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
 				}
+				writer = new IndexWriter(dir, iwc);
+			}
+				/* We process each subfolder in a new thread. */
+				for (final Path path : list) indexDocs(writer,path);
+				if(parcial) writer.close();
 
 		} catch (final IOException e) {
 			e.printStackTrace();
@@ -207,10 +253,20 @@ public class IndexFiles {
 			e.printStackTrace();
 			System.exit(-2);
 		}
-			writer.close();
+		
+		System.out.println("Finished all threads");
+		
+		if(parcial) {
+			System.out.println("Merging parcial indexes");
+			for(int n=0;n<i;n++) {
+				parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i);
+				finalwriter.addIndexes(new MMapDirectory(Path.of(parcialPath)));
+			}
+		}
+		
+			finalwriter.close();
 
 			Date end = new Date();
-			System.out.println("Finished all threads");
 			System.out.println(end.getTime() - start.getTime() + " total milliseconds");
 
 		} catch (IOException e) {
