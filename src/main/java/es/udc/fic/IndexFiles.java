@@ -21,7 +21,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
@@ -60,12 +62,14 @@ public class IndexFiles {
 		private final IndexWriter w;
 		private final boolean parcialIndex;
 		private final String[] fileTypes;
+		private final String[] lines;
 
-		public WorkerThread(final Path folder, IndexWriter w, boolean p,String[] t) {
+		public WorkerThread(final Path folder, IndexWriter w, boolean p,String[] t,String[] l) {
 			this.folder = folder;
 			this.w=w;
 			this.parcialIndex = p;
 			this.fileTypes = t;
+			this.lines=l;
 		}
 
 		/**
@@ -77,7 +81,7 @@ public class IndexFiles {
 			System.out.println(String.format("I am the thread '%s' and I am responsible for folder '%s'",
 					Thread.currentThread().getName(), folder));
 			try {
-				indexDocs(w, folder,fileTypes);
+				indexDocs(w, folder,fileTypes,lines);
 				if(this.parcialIndex) w.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -106,6 +110,10 @@ public class IndexFiles {
 		String openmode = null;
 		String[] types = null;
 		int threads=0;
+		String[] lines= new String[2];
+		lines[0]=p.getProperty("onlyTopLines");
+		lines[1]=p.getProperty("onlyBottomLines");
+		
 		for (int i = 0; i < args.length; i++) {
 			if ("-index".equals(args[i])) {
 				indexPath = args[i + 1];
@@ -123,7 +131,7 @@ public class IndexFiles {
 				threads = Integer.valueOf(args[i+1]);
 				i++;
 			}
-		}
+		} 
 
 		if(indexPath.equals("index")) {
 			System.err.println("Usage: " + usage);
@@ -204,7 +212,7 @@ public class IndexFiles {
 							writer = new IndexWriter(dir, iwc);
 							i++;
 					}
-					final Runnable worker = new WorkerThread(path,writer,parcial,types);
+					final Runnable worker = new WorkerThread(path,writer,parcial,types,lines);
 					/*
 					 * Send the thread to the ThreadPool. It will be processed eventually.
 					 */
@@ -234,7 +242,7 @@ public class IndexFiles {
 				writer = new IndexWriter(dir, iwc);
 			}
 				/* We process each subfolder in a new thread. */
-				for (final Path path : list) indexDocs(writer,path,types);
+				for (final Path path : list) indexDocs(writer,path,types,lines);
 				if(parcial) writer.close();
 
 		} catch (final IOException e) {
@@ -300,13 +308,13 @@ public class IndexFiles {
 		}
 	}		
 		
-		static void indexDocs(final IndexWriter writer, Path path, String[] types) throws IOException {
+		static void indexDocs(final IndexWriter writer, Path path, String[] types,String[] lines) throws IOException {
 			if (Files.isDirectory(path)) {
 				Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
 					@Override
 					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 						try {
-							if (in(file.toString(),types)) indexDoc(writer, file, attrs.lastModifiedTime().toMillis());
+							if (in(file.toString(),types)) indexDoc(writer, file, attrs.lastModifiedTime().toMillis(),lines);
 						} catch (IOException ignore) {
 							// don't index files that can't be read.
 						}
@@ -314,12 +322,12 @@ public class IndexFiles {
 					}
 				});
 			} else {
-				if (in(path.toString(),types)) indexDoc(writer, path, Files.getLastModifiedTime(path).toMillis());
+				if (in(path.toString(),types)) indexDoc(writer, path, Files.getLastModifiedTime(path).toMillis(),lines);
 			}
 		}
 
 		/** Indexes a single document */
-		static void indexDoc(IndexWriter writer, Path file, long lastModified) throws IOException {
+		static void indexDoc(IndexWriter writer, Path file, long lastModified,String[] lines) throws IOException {
 			try (InputStream stream = Files.newInputStream(file)) {
 				// make a new, empty document
 				Document doc = new Document();
@@ -366,9 +374,27 @@ public class IndexFiles {
 				// so that the text of the file is tokenized and indexed, but not stored.
 				// Note that FileReader expects the file to be in UTF-8 encoding.
 				// If that's not the case searching for special characters will fail.
-				doc.add(new TextField("contents",
-						new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))));
-
+				BufferedReader buf = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+				if(lines[0]==null)lines[0]="0";
+				if(lines[1]==null)lines[1]="0";
+				int top = Integer.valueOf(lines[0]);
+				int bot = Integer.valueOf(lines[1]);
+				if ((top<=0) && (bot<=0)) doc.add(new TextField("contents",buf));
+				else {
+					String aux;
+					ArrayList<String> c = new ArrayList<String>();
+					while ((aux=buf.readLine())!=null) c.add(aux);
+					if ((bot+top)>=c.size()) doc.add(new TextField("contents",buf));
+					else {
+						int i;
+						aux="";
+						for(i=0;i<top;i++) aux += c.get(i)+"\n";
+						for(i=bot;i>0;i--) aux += c.get(c.size()-i)+"\n";
+						InputStream inputStream = new ByteArrayInputStream(aux.getBytes(Charset.forName("UTF-8")));
+						buf = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+						doc.add(new TextField("contents",buf));
+					}
+				}
 				if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
 					// New index, so we just add the document (no old document can be there):
 					System.out.println("adding " + file);
