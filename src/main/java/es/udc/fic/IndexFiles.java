@@ -54,20 +54,18 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.MMapDirectory;
 
 public class IndexFiles {
-
-	/**
-	 * This Runnable takes a folder and prints its path.
-	 */
 	public static class WorkerThread implements Runnable {
 
 		private final Path folder;
 		private final IndexWriter w;
-		private final boolean parcialIndex; 
+		private final boolean parcialIndex;
+		private final String[] fileTypes;
 
-		public WorkerThread(final Path folder, IndexWriter w, boolean p) {
+		public WorkerThread(final Path folder, IndexWriter w, boolean p,String[] t) {
 			this.folder = folder;
 			this.w=w;
 			this.parcialIndex = p;
+			this.fileTypes = t;
 		}
 
 		/**
@@ -79,7 +77,7 @@ public class IndexFiles {
 			System.out.println(String.format("I am the thread '%s' and I am responsible for folder '%s'",
 					Thread.currentThread().getName(), folder));
 			try {
-				indexDocs(w, folder);
+				indexDocs(w, folder,fileTypes);
 				if(this.parcialIndex) w.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -88,6 +86,7 @@ public class IndexFiles {
 		}
 
 	}
+
 
 	public static void main(final String[] args) {
 
@@ -105,6 +104,7 @@ public class IndexFiles {
 		boolean create = true;
 		boolean parcial = false;
 		String openmode = null;
+		String[] types = null;
 		int threads=0;
 		for (int i = 0; i < args.length; i++) {
 			if ("-index".equals(args[i])) {
@@ -112,6 +112,8 @@ public class IndexFiles {
 				i++;
 			} else if ("-update".equals(args[i])) {
 				create = false;
+			} else if ("-onlyFiles".equals(args[i])) {
+				types = p.getProperty("onlyFiles").split(" ");
 			} else if ("-partialIndexes".equals(args[i])) {
 				parcial = true;
 			} else if ("-openmode".equals(args[i])) {
@@ -202,7 +204,7 @@ public class IndexFiles {
 							writer = new IndexWriter(dir, iwc);
 							i++;
 					}
-					final Runnable worker = new WorkerThread(path,writer,parcial);
+					final Runnable worker = new WorkerThread(path,writer,parcial,types);
 					/*
 					 * Send the thread to the ThreadPool. It will be processed eventually.
 					 */
@@ -232,7 +234,7 @@ public class IndexFiles {
 				writer = new IndexWriter(dir, iwc);
 			}
 				/* We process each subfolder in a new thread. */
-				for (final Path path : list) indexDocs(writer,path);
+				for (final Path path : list) indexDocs(writer,path,types);
 				if(parcial) writer.close();
 
 		} catch (final IOException e) {
@@ -258,10 +260,34 @@ public class IndexFiles {
 		
 		if(parcial) {
 			System.out.println("Merging parcial indexes");
-			for(int n=0;n<i;n++) {
-				parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i);
-				finalwriter.addIndexes(new MMapDirectory(Path.of(parcialPath)));
+			String auxPath1;
+			String auxPath2;
+			parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i-1);
+			for(int n=1;n<i+1;n++) {
+				parcialPath= p.getProperty("partialIndexes")+"/s"+ Integer.toString(n);
+				if(n==1) auxPath1= p.getProperty("partialIndexes")+"/p"+ Integer.toString(n-1);
+				else auxPath1= p.getProperty("partialIndexes")+"/s"+ Integer.toString(n-1);
+				auxPath2= p.getProperty("partialIndexes")+"/p"+ Integer.toString(n);
+				dir = FSDirectory.open(Paths.get(parcialPath));
+				analyzer = new StandardAnalyzer();
+				iwc = new IndexWriterConfig(analyzer);
+
+				if ((!create && openmode==null) || openmode.equals("create_or_append") ) {
+					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+				} else if (create && openmode.equals("create")) {
+					iwc.setOpenMode(OpenMode.CREATE);
+				} else if ( openmode.equals("append")) {
+					iwc.setOpenMode(OpenMode.APPEND);
+				} else {
+					System.out.println("openMode error: Correct formats are append, create(not compatible with -upgrade) or create_or_append. Running create_or_append as default" );
+					iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+				}
+				writer = new IndexWriter(dir, iwc);
+				
+				writer.addIndexes(new MMapDirectory(Path.of(auxPath1)),new MMapDirectory(Path.of(auxPath2)));
+				writer.close();
 			}
+			finalwriter.addIndexes(new MMapDirectory(Path.of(parcialPath)));
 		}
 		
 			finalwriter.close();
@@ -274,13 +300,13 @@ public class IndexFiles {
 		}
 	}		
 		
-		static void indexDocs(final IndexWriter writer, Path path) throws IOException {
+		static void indexDocs(final IndexWriter writer, Path path, String[] types) throws IOException {
 			if (Files.isDirectory(path)) {
 				Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
 					@Override
 					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 						try {
-							indexDoc(writer, file, attrs.lastModifiedTime().toMillis());
+							if (in(file.toString(),types)) indexDoc(writer, file, attrs.lastModifiedTime().toMillis());
 						} catch (IOException ignore) {
 							// don't index files that can't be read.
 						}
@@ -288,7 +314,7 @@ public class IndexFiles {
 					}
 				});
 			} else {
-				indexDoc(writer, path, Files.getLastModifiedTime(path).toMillis());
+				if (in(path.toString(),types)) indexDoc(writer, path, Files.getLastModifiedTime(path).toMillis());
 			}
 		}
 
@@ -355,6 +381,13 @@ public class IndexFiles {
 					writer.updateDocument(new Term("path", file.toString()), doc);
 				}
 			}
+		}
+		
+		private static boolean in(String s, String[] list) {
+			if (list==null) return true;
+			boolean result = false;
+			for (String i : list) if(s.endsWith(i)) result=true;
+			return result;
 		}
 
 	}
