@@ -94,7 +94,7 @@ public class IndexFiles {
 
 	public static void main(final String[] args) {
 
-		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes]\n\n";
+		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes] [-onlyFiles]\n\n";
 		
 		Properties p = new Properties();
 		try {
