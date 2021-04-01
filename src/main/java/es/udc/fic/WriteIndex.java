@@ -6,7 +6,6 @@ import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -14,6 +13,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.MultiTerms;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.store.Directory;
@@ -65,30 +65,39 @@ public class WriteIndex {
 		try {
 			dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader reader= DirectoryReader.open(dir);
+			
+			
+			
 			List<LeafReaderContext> list = reader.leaves();
 			LeafReader[] leafs= new LeafReader[list.size()];
 			for(int i=0; i<list.size();i++) leafs[i]=list.get(i).reader();
 			FieldInfos fInfos = leafs[0].getFieldInfos();
 			String[] fields = new String[fInfos.size()];
-			
-			
+				
 			for(int i=0; i<fInfos.size();i++) fields[i]=fInfos.fieldInfo(i).name;
 			String aux="";
-			List<String> auxL;
+			
 			for(int i=0; i<fields.length;i++) {
 				aux += "\n"+fields[i]+":\n\n";
-				auxL=new ArrayList<>();
-				for(LeafReader leaf : leafs) {
-					Terms terms = leaf.terms(fields[i]);
-					try {
-						TermsEnum enumeration = terms.iterator();
-						BytesRef term;
-						while((term=enumeration.next())!= null) if(!auxL.contains(term.utf8ToString()+"\n")) auxL.add(term.utf8ToString()+"\n");
-					} catch (java.lang.NullPointerException e) {
-					}
+				Terms terms = MultiTerms.getTerms(reader, fields[i]);
+				try {
+					TermsEnum enumeration = terms.iterator();
+					BytesRef term;
+					while((term=enumeration.next())!= null) aux+= term.utf8ToString()+"\n";
+				} catch (java.lang.NullPointerException e) {
 				}
-				if (auxL.isEmpty()) aux+= "----No Terms For This Filed----\n";
-				for(String s:auxL) aux+=s;
+			}
+			
+			
+			Terms terms = MultiTerms.getTerms(reader,"contents");
+			try {
+				TermsEnum enumeration = terms.iterator();
+				BytesRef term;
+				while((term=enumeration.next())!= null) {
+					System.out.print(term.utf8ToString());
+					System.out.println(enumeration.docFreq());
+				}
+			} catch (java.lang.NullPointerException e) {
 			}
 			
 			reader.close();
