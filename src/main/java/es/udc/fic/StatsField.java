@@ -54,17 +54,14 @@ public class StatsField {
             CollectionStatistics collectionStatistics;
             dir = FSDirectory.open(Paths.get(indexPath));
             DirectoryReader reader= DirectoryReader.open(dir);
-            List<LeafReaderContext> list = reader.leaves();
-            LeafReader[] leafs= new LeafReader[list.size()];
-            for(int i=0; i<list.size();i++) leafs[i]=list.get(i).reader();
             if (field != null) {
                 try {
                     collectionStatistics = new CollectionStatistics(
                             field,
-                            leafs[0].maxDoc(),
-                            leafs[0].getDocCount(field),
-                            leafs[0].getSumTotalTermFreq(field),
-                            leafs[0].getSumDocFreq(field)
+                            reader.maxDoc(),
+                            reader.getDocCount(field),
+                            reader.getSumTotalTermFreq(field),
+                            reader.getSumDocFreq(field)
                     );
                     System.out.println("Stadictics of field " + field + ":");
                     System.out.println(collectionStatistics.toString());
@@ -73,16 +70,17 @@ public class StatsField {
                 }
 
             } else {
-                FieldInfos fInfos = leafs[0].getFieldInfos();
+                List<IndexableField> fields = reader.document(0).getFields();
+                fields.get(0).toString();
                 try {
-                    for(int i=0; i<fInfos.size();i++) {
-                        field=fInfos.fieldInfo(i).name;
+                    for(IndexableField fieldItem : fields) {
+                        field = fieldItem.name();
                         collectionStatistics = new CollectionStatistics(
                                 field,
-                                leafs[0].maxDoc(),
-                                leafs[0].getDocCount(field),
-                                leafs[0].getSumTotalTermFreq(field),
-                                leafs[0].getSumDocFreq(field)
+                                reader.maxDoc(),
+                                reader.getDocCount(field),
+                                reader.getSumTotalTermFreq(field),
+                                reader.getSumDocFreq(field)
                         );
                         System.out.println("Stadictics of field " + field + ":");
                         System.out.println(collectionStatistics.toString());
@@ -93,7 +91,7 @@ public class StatsField {
 
 
             }
-
+        reader.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
