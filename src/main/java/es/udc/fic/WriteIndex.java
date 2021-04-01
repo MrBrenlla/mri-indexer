@@ -25,7 +25,7 @@ public class WriteIndex {
 	
 	public static void main(final String[] args) {
 
-		String usage = "java org.apache.lucene.demo.WriteIndex" + " [-index INDEX_PATH] [-outputFile OUTPUT_FILE]\n\n";
+		String usage = "java es.udc.fic.WriteIndex" + " [-index INDEX_PATH] [-outputFile OUTPUT_FILE]\n\n";
 		
 		Properties p = new Properties();
 		try {
@@ -104,8 +104,6 @@ public class WriteIndex {
 	            e.printStackTrace();
 	        } finally {
 	           try {
-	           // Nuevamente aprovechamos el finally para 
-	           // asegurarnos que se cierra el fichero.
 	           if (null != fichero)
 	              fichero.close();
 	           } catch (Exception e2) {

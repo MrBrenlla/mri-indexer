@@ -44,9 +44,11 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.DateTools;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
@@ -94,7 +96,7 @@ public class IndexFiles {
 
 	public static void main(final String[] args) {
 
-		String usage = "java org.apache.lucene.demo.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes] [-onlyFiles]\n\n";
+		String usage = "java es.udc.fic.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes] [-onlyFiles]\n\n";
 		
 		Properties p = new Properties();
 		try {
@@ -336,29 +338,36 @@ public class IndexFiles {
 				// field that is indexed (i.e. searchable), but don't tokenize
 				// the field into separate words and don't index term frequency
 				// or positional information:
-				Field pathField = new StringField("path", file.toString(), Field.Store.YES);
+				
+				FieldType type = new FieldType();
+				type.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+				type.setTokenized(false);
+				type.setStored(true);
+				type.setStoreTermVectors(true);
+				
+				Field pathField = new Field("path", file.toString(), type);
 				doc.add(pathField);
-				Field hostname = new StringField("hostname", InetAddress.getLocalHost().getHostName(), Field.Store.YES);
+				Field hostname = new Field("hostname", InetAddress.getLocalHost().getHostName(),type);
 				doc.add(hostname);
-				Field thread = new StringField("thread", Thread.currentThread().getName(), Field.Store.YES);
+				Field thread = new Field("thread", Thread.currentThread().getName(), type);
 				doc.add(thread);
-				Field sizeKB = new StringField("sizeKB", String.valueOf(file.toFile().length()/1000), Field.Store.YES);
+				Field sizeKB = new Field("sizeKB", String.valueOf(file.toFile().length()/1000),type);
 				doc.add(sizeKB);
 				
 				FileTime ct = Files.readAttributes(file, BasicFileAttributes.class).creationTime();
 				FileTime lat = Files.readAttributes(file, BasicFileAttributes.class).creationTime();
 				FileTime lmt = Files.readAttributes(file, BasicFileAttributes.class).creationTime();
-				Field creationTime = new StringField("creationTime",ct.toString(), Field.Store.YES);
+				Field creationTime = new Field("creationTime",ct.toString(), type);
 				doc.add(creationTime);
-				Field lastAccessTime = new StringField("lastAccessTime",lat.toString(), Field.Store.YES);
+				Field lastAccessTime = new Field("lastAccessTime",lat.toString(), type);
 				doc.add(lastAccessTime);
-				Field lastModifiedTime = new StringField("lastModifiedTime",lmt.toString(), Field.Store.YES);
+				Field lastModifiedTime = new Field("lastModifiedTime",lmt.toString(),  type);
 				doc.add(lastModifiedTime);
-				Field creationTimeLucene = new StringField("creationTimeLucene",DateTools.timeToString(ct.toMillis(), DateTools.Resolution.MILLISECOND), Field.Store.YES);
+				Field creationTimeLucene = new Field("creationTimeLucene",DateTools.timeToString(ct.toMillis(), DateTools.Resolution.MILLISECOND), type);
 				doc.add(creationTimeLucene);
-				Field lastAccessTimeLucene = new StringField("lastAccessTimeLucene",DateTools.timeToString(lat.toMillis(), DateTools.Resolution.MILLISECOND), Field.Store.YES);
+				Field lastAccessTimeLucene = new Field("lastAccessTimeLucene",DateTools.timeToString(lat.toMillis(), DateTools.Resolution.MILLISECOND),  type);
 				doc.add(lastAccessTimeLucene);
-				Field lastModifiedTimeLucene = new StringField("lastModifiedTimeLucene",DateTools.timeToString(lmt.toMillis(), DateTools.Resolution.MILLISECOND), Field.Store.YES);
+				Field lastModifiedTimeLucene = new Field("lastModifiedTimeLucene",DateTools.timeToString(lmt.toMillis(), DateTools.Resolution.MILLISECOND), type);
 				doc.add(lastModifiedTimeLucene);
 
 				// Add the last modified date of the file a field named "modified".
@@ -368,23 +377,29 @@ public class IndexFiles {
 				// year/month/day/hour/minutes/seconds, down the resolution you require.
 				// For example the long value 2011021714 would mean
 				// February 17, 2011, 2-3 PM.
-				doc.add(new LongPoint("modified", lastModified));
+				Date d = new Date(lastModified);
+				doc.add(new Field("modified", d.toString(),type));
 
 				// Add the contents of the file to a field named "contents". Specify a Reader,
 				// so that the text of the file is tokenized and indexed, but not stored.
 				// Note that FileReader expects the file to be in UTF-8 encoding.
 				// If that's not the case searching for special characters will fail.
+				FieldType type2 = new FieldType();
+				type2.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+				type2.setTokenized(true);
+				type2.setStored(false);
+				type2.setStoreTermVectors(true);
 				BufferedReader buf = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
 				if(lines[0]==null)lines[0]="0";
 				if(lines[1]==null)lines[1]="0";
 				int top = Integer.valueOf(lines[0]);
 				int bot = Integer.valueOf(lines[1]);
-				if ((top<=0) && (bot<=0)) doc.add(new TextField("contents",buf));
+				if ((top<=0) && (bot<=0)) doc.add(new Field("contents",buf,type2));
 				else {
 					String aux;
 					ArrayList<String> c = new ArrayList<String>();
 					while ((aux=buf.readLine())!=null) c.add(aux);
-					if ((bot+top)>=c.size()) doc.add(new TextField("contents",buf));
+					if ((bot+top)>=c.size()) doc.add(new Field("contents",buf,type2));
 					else {
 						int i;
 						aux="";
@@ -392,7 +407,7 @@ public class IndexFiles {
 						for(i=bot;i>0;i--) aux += c.get(c.size()-i)+"\n";
 						InputStream inputStream = new ByteArrayInputStream(aux.getBytes(Charset.forName("UTF-8")));
 						buf = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-						doc.add(new TextField("contents",buf));
+						doc.add(new Field("contents",buf,type2));
 					}
 				}
 				if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
