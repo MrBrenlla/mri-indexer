@@ -1,22 +1,15 @@
 package es.udc.fic;
 
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.LeafReader;
-import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.MultiTerms;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
@@ -26,7 +19,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 
-class Similarity implements Comparable{
+class Similarity implements Comparable<Object>{
 	private String term;
     private double nota;
     
@@ -79,14 +72,13 @@ public class SimilarTerms {
 	
 	private static double[] bin(String t, String f, IndexReader r) throws IOException {
 		double[] v= new double[r.numDocs()];
-		ClassicSimilarity sim = new ClassicSimilarity();
 		for (int i =0; i<r.numDocs();i++) {
 			double aux;
 			TermsEnum terms = r.getTermVector(i,f).iterator();			
 			BytesRef term=terms.next();
 			while(term!=null && !term.utf8ToString().equals(t)) term=terms.next();
 			if (term==null) aux=0;
-			else aux= sim.tf(terms.docFreq());
+			else aux= terms.docFreq();
 			v[i]=aux;
 		}
 		return v;
@@ -101,7 +93,7 @@ public class SimilarTerms {
 			BytesRef term=terms.next();
 			while(term!=null && !term.utf8ToString().equals(t)) term=terms.next();
 			if (term==null) aux=0;
-			else aux= sim.tf(terms.docFreq());
+			else aux= sim.tf(terms.totalTermFreq());
 			v[i]=aux;
 		}
 		return v;
@@ -118,7 +110,7 @@ public class SimilarTerms {
 			if (term==null) aux=0;
 			else { 
 				Term auxT = new Term(f,t);
-				aux= sim.tf(terms.docFreq())*sim.idf(r.docFreq(auxT), r.numDocs());
+				aux= sim.tf(terms.totalTermFreq())*sim.idf(r.docFreq(auxT), r.numDocs());
 			}
 			v[i]=aux;
 		}
