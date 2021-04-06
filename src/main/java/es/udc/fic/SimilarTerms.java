@@ -31,6 +31,10 @@ class Similarity implements Comparable<Object>{
 		return nota;
 	}
 
+	public void setNota(double nota) {
+    	this.nota = nota;
+	}
+
     public Similarity(String t, double n) {
     	term=t;
     	nota=n;
@@ -51,8 +55,7 @@ class Similarity implements Comparable<Object>{
     public String toString() {
         return "termino=" + term + ", similaridade=" + nota;
     }
-    
-    
+
 }
 
 
