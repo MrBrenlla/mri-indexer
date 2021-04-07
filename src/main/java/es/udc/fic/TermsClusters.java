@@ -67,21 +67,15 @@ class Cluster {
 
 class KMeans {
 
-    private int NUM_CLUSTERS = 3;
-    //Number of Points
-    private int NUM_SIMILARITYS = 15;
-    //Min and Max X and Y
-    private static final int MIN_SIMILARITY = 0;
-    private static final int MAX_SIMILARITY = 10;
+    private int NUM_CLUSTERS;
 
     private ArrayList<Similarity> similaritys;
     private ArrayList<Cluster> clusters;
 
-    public KMeans(int numClusters, int numSimilaritys) {
+    public KMeans(int numClusters) {
         this.similaritys = new ArrayList();
         this.clusters = new ArrayList();
         NUM_CLUSTERS = numClusters;
-        NUM_SIMILARITYS = numSimilaritys;
     }
 
     public void init(ArrayList<Similarity> similaritys) {
@@ -276,9 +270,10 @@ public class TermsClusters {
         String content = null;
         String top = null;
         String rep= null;
-        String k= null;
+        String kString= null;
 
         int n;
+        int k;
 
         for (int i = 0; i < args.length; i++) {
             if ("-index".equals(args[i])) {
@@ -297,18 +292,19 @@ public class TermsClusters {
                 rep = args[i + 1];
                 i++;
             }else if ("-k".equals(args[i])) {
-                k = args[i + 1];
+                kString = args[i + 1];
                 i++;
             }
         }
 
 
-        if((indexPath==null)||(field==null)||(top==null)||(content==null)||(k==null)) {
+        if((indexPath==null)||(field==null)||(top==null)||(content==null)||(kString==null)) {
             System.err.println("Usage: " + usage);
             System.exit(1);
         }
 
         n=Integer.valueOf(top);
+        k=Integer.valueOf(kString);
 
         if(rep==null) {
             System.out.println("Not -rep especified, using tfxidf as default.");
@@ -354,6 +350,7 @@ public class TermsClusters {
                 TermsEnum enumeration = terms.iterator();
                 BytesRef auxterm;
                 double[] aux;
+                KMeans kMeansAlgorith;
                 while((auxterm=enumeration.next())!= null) if(!auxterm.utf8ToString().equals(content)) {
                     switch(rep) {
                         case "bin" :aux=bin(auxterm.utf8ToString(),field,reader);
@@ -371,7 +368,9 @@ public class TermsClusters {
 
                 for(int i=0; i<n && i<rank.size();i++) System.out.println(rank.get(i).toString());
 
-
+                kMeansAlgorith = new KMeans(k);
+                kMeansAlgorith.init(rank);
+                kMeansAlgorith.calculate();
 
             } catch (java.lang.NullPointerException e) {
             }
