@@ -77,7 +77,7 @@ public class BestTerms {
             dir = FSDirectory.open(Paths.get(indexPath));
             DirectoryReader reader= DirectoryReader.open(dir);
             try {
-                TermsEnum enumeration = reader.getTermVector(0,"path").iterator();
+                TermsEnum enumeration = reader.getTermVector(docID,field).iterator();
                 HashMap<String, Float> tfmap = new HashMap<>();
                 HashMap<String, Float> idfmap = new HashMap<>();
                 HashMap<String, Float> tfxidfmap = new HashMap<>();
@@ -92,7 +92,7 @@ public class BestTerms {
 
                 while((term=enumeration.next())!= null) {
 
-                    tf = tfidfSIM.tf(reader.docFreq(new Term("path",term)));
+                    tf = tfidfSIM.tf(reader.docFreq(new Term(field,term)));
                     tfmap.put(term.utf8ToString(), tf);
 
                     idf = tfidfSIM.idf(enumeration.docFreq(), reader.numDocs());
