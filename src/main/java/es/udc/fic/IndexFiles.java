@@ -276,7 +276,7 @@ public class IndexFiles {
 			System.out.println("Merging parcial indexes");
 			String auxPath1;
 			String auxPath2;
-			parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i-1);
+			parcialPath= p.getProperty("partialIndexes")+"/p"+ Integer.toString(i);
 			for(int n=1;n<i+1;n++) {
 				parcialPath= p.getProperty("partialIndexes")+"/s"+ Integer.toString(n);
 				if(n==1) auxPath1= p.getProperty("partialIndexes")+"/p"+ Integer.toString(n-1);
