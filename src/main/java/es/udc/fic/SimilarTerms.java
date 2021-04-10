@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Properties;
 
 import org.apache.lucene.index.DirectoryReader;
@@ -182,7 +183,7 @@ public class SimilarTerms {
 					+ "' does not exist or is not readable, please check the path");
 			System.exit(1);
 		}
-		
+		Date start = new Date();
 		Directory dir;
 		try {
 			dir = FSDirectory.open(Paths.get(indexPath));
@@ -224,10 +225,12 @@ public class SimilarTerms {
 					rank.add(new Similarity(auxterm.utf8ToString(),cosineSimilarity(aux,base)));
 				}
 				
-				//Da un warning por usar a clase Comparable, a causa de que non se comproba se "rank" é un List<Comparable> dentro da función sort, pero funiona sen problemas.
 				Collections.sort(rank);
 				
 				for(int i=0; i<n && i<rank.size();i++) System.out.println(rank.get(i).toString());
+				
+				Date end = new Date();
+				System.out.println(end.getTime() - start.getTime() + " total milliseconds");
 				
 			} catch (java.lang.NullPointerException e) {
 			}

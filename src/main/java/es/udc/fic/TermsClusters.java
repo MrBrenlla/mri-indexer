@@ -21,7 +21,7 @@ class Cluster {
     //Creates a new Cluster
     public Cluster(int id) {
         this.id = id;
-        this.similaritys = new ArrayList();
+        this.similaritys = new ArrayList<>();
     }
 
     public ArrayList<Similarity> getPoints() {
@@ -73,8 +73,8 @@ class KMeans {
     private ArrayList<Cluster> clusters;
 
     public KMeans(int numClusters) {
-        this.similaritys = new ArrayList();
-        this.clusters = new ArrayList();
+        this.similaritys = new ArrayList<>();
+        this.clusters = new ArrayList<>();
         NUM_CLUSTERS = numClusters;
     }
 
@@ -144,7 +144,7 @@ class KMeans {
     }
 
     private ArrayList<Similarity> getCentroids() {
-        ArrayList<Similarity> centroids = new ArrayList(NUM_CLUSTERS);
+        ArrayList<Similarity> centroids = new ArrayList<>(NUM_CLUSTERS);
         for(Cluster cluster : clusters) {
             Similarity aux = cluster.getCentroid();
             Similarity similarity = new Similarity(aux.getTerm(),aux.getNota());
@@ -321,6 +321,8 @@ public class TermsClusters {
                     + "' does not exist or is not readable, please check the path");
             System.exit(1);
         }
+        
+        Date start = new Date();
 
         Directory dir;
         try {
@@ -382,6 +384,8 @@ public class TermsClusters {
 
             reader.close();
 
+            Date end = new Date();
+			System.out.println(end.getTime() - start.getTime() + " total milliseconds");
 
         } catch (IOException e) {
             // TODO Auto-generated catch block
