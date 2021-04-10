@@ -1,7 +1,8 @@
 package es.udc.fic;
 
-import org.apache.lucene.index.*;
-import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.search.similarities.TFIDFSimilarity;
 import org.apache.lucene.store.Directory;
@@ -16,8 +17,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static java.lang.Math.sqrt;
 
 public class BestTerms {
     public static void main(final String[] args) {
@@ -62,7 +61,6 @@ public class BestTerms {
             }
 
         }
-        System.out.println("Random Double: " + new Random().nextDouble());
         if(indexPath==null || docID==-1 || field==null || top==-1 || order==null) {
             System.err.println("Usage: " + usage);
             System.exit(1);
@@ -93,7 +91,6 @@ public class BestTerms {
                 Iterator<Map.Entry<String, Float>> it = null;
 
                 while((term=enumeration.next())!= null) {
-                    System.out.println(new Term("path",term).text());
 
                     tf = tfidfSIM.tf(reader.docFreq(new Term("path",term)));
                     tfmap.put(term.utf8ToString(), tf);
@@ -104,7 +101,6 @@ public class BestTerms {
                     ScoreTfxIdf = tf*idf;
                     tfxidfmap.put(term.utf8ToString(), ScoreTfxIdf);
 
-                    System.out.println("Termino: " + term.utf8ToString() + "\n Score: " + ScoreTfxIdf);
                     if (order.equals("tf")) {
                         sortedMap = tfmap.entrySet().stream()
                                 .sorted(Map.Entry.<String, Float>comparingByValue().reversed())
@@ -127,7 +123,6 @@ public class BestTerms {
                     }
 
                 }
-                //System.out.println(unsortedMap);
 
                 int i = 0;
                 it = sortedMap.entrySet().iterator();
@@ -218,7 +213,6 @@ public class BestTerms {
                         i++;
                     }
                 }
-                System.out.println(sortedMap);
 
             } catch (java.lang.NullPointerException e) {
                 System.err.println(e);

@@ -28,12 +28,12 @@ class Cluster {
         return similaritys;
     }
 
-    public void addPoint(Similarity point) {
-        similaritys.add(point);
+    public void addSimilarity(Similarity similarity) {
+        similaritys.add(similarity);
     }
 
-    public void setPoints(ArrayList<Similarity> points) {
-        this.similaritys = points;
+    public void setSimilaritys(ArrayList<Similarity> similaritys) {
+        this.similaritys = similaritys;
     }
 
     public Similarity getCentroid() {
@@ -170,7 +170,7 @@ class KMeans {
                 }
             }
             //point.setCluster(cluster);
-            clusters.get(cluster).addPoint(similarity);
+            clusters.get(cluster).addSimilarity(similarity);
         }
     }
 
@@ -255,7 +255,8 @@ public class TermsClusters {
     }
 
     public static void main(String[] args) {
-        String usage = "java es.udc.fic.TermsClusters" + " [-index INDEX_PATH] [-field FIELD] [-term TERM] [-top NUM] [-rep bin|tf|tfxidf]\n\n";
+        String usage = "java es.udc.fic.TermsClusters" + " [-index INDEX_PATH] [-field FIELD] [-term TERM] [-top NUM] "
+                                                       + " [-rep bin|tf|tfxidf] [-k NUM_OF_CLUSTERS]\n\n";
 
         Properties p = new Properties();
         try {
