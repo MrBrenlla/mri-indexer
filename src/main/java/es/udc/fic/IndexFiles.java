@@ -94,7 +94,7 @@ public class IndexFiles {
 
 	public static void main(final String[] args) {
 
-		String usage = "java es.udc.fic.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes] [-onlyFiles]\n\n";
+		String usage = "java es.udc.fic.IndexFiles" + " [-index INDEX_PATH] [-update] [-numThreads NUM_THREADS] [-openmode append|create|create_or_append] [-partialIndexes] [-onlyFiles] [-onlyTopLines] [-onlyBottomLines]\n\n";
 		
 		Properties p = new Properties();
 		try {
@@ -111,8 +111,8 @@ public class IndexFiles {
 		String[] types = null;
 		int threads=0;
 		String[] lines= new String[2];
-		lines[0]=p.getProperty("onlyTopLines");
-		lines[1]=p.getProperty("onlyBottomLines");
+		lines[0]=null;
+		lines[0]=null;
 		
 		for (int i = 0; i < args.length; i++) {
 			if ("-index".equals(args[i])) {
@@ -130,6 +130,12 @@ public class IndexFiles {
 			}else if ("-numThreads".equals(args[i])) {
 				threads = Integer.valueOf(args[i+1]);
 				i++;
+			}else if ("-onlyTopLines".equals(args[i])) {
+				lines[0]=p.getProperty("onlyTopLines");
+				if (lines[0] == null) System.out.println("Number of top lines not in config.properties, not using this atribute");
+			}else if ("-onlyBottomLines".equals(args[i])) {
+				lines[1]=p.getProperty("onlyBottomLines");
+				if (lines[1] == null) System.out.println("Number of bottom lines not in config.properties, not using this atribute");
 			}
 		} 
 
